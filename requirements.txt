@@ -20,6 +20,7 @@ google-generativeai==0.8.3     # Gemini (default)
 # --- Config + CLI ---
 python-dotenv==1.0.1           # load .env
 typer==0.12.5                  # CLI for `index` / `ask` / `eval`
+click==8.1.7                   # pinned: typer 0.12.x is incompatible with click >= 8.2
 rich==13.9.4                   # readable terminal output (answers + citations)
 
 # --- Optional demo UI (Phase 5) ---
