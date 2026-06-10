@@ -1,0 +1,20 @@
+{"id": "q01", "question": "What is the conventional end-of-life SOH threshold for automotive traction batteries?", "type": "answerable", "expected_source": "soh_methods.md", "answer_contains": ["80"]}
+{"id": "q02", "question": "How is capacity-based State of Health defined?", "type": "answerable", "expected_source": "soh_methods.md", "answer_contains": ["present", "rated"]}
+{"id": "q03", "question": "Why does energy-based SOH fade faster than capacity-based SOH?", "type": "answerable", "expected_source": "soh_methods.md", "answer_contains": ["resistance"]}
+{"id": "q04", "question": "What common power-fade end-of-life criterion is based on internal resistance?", "type": "answerable", "expected_source": "soh_methods.md", "answer_contains": ["doubl", "100"]}
+{"id": "q05", "question": "What is the difference between ICA and DVA?", "type": "answerable", "expected_source": "soh_methods.md", "answer_contains": ["dQ/dV", "dV/dQ"]}
+{"id": "q06", "question": "What does LLI stand for and what does it reduce?", "type": "answerable", "expected_source": "soh_methods.md", "answer_contains": ["lithium inventory", "capacity"]}
+{"id": "q07", "question": "What is the difference between State of Charge and State of Health?", "type": "answerable", "expected_source": "li_ion_basics.md", "answer_contains": ["full", "aged"]}
+{"id": "q08", "question": "What is a C-rate and what is 1C for a 1.1 Ah cell?", "type": "answerable", "expected_source": "li_ion_basics.md", "answer_contains": ["1.1"]}
+{"id": "q09", "question": "What risk does charging a lithium-ion cell at low temperature create?", "type": "answerable", "expected_source": "li_ion_basics.md", "answer_contains": ["plating"]}
+{"id": "q10", "question": "What is the maximum charge voltage of the Aurora AR-2100 cell?", "type": "answerable", "expected_source": "example_cell_datasheet.md", "answer_contains": ["4.20"]}
+{"id": "q11", "question": "What is the nominal capacity of the AR-2100?", "type": "answerable", "expected_source": "example_cell_datasheet.md", "answer_contains": ["5.0"]}
+{"id": "q12", "question": "Can the AR-2100 be charged at -10 degrees Celsius?", "type": "answerable", "expected_source": "example_cell_datasheet.md", "answer_contains": ["0", "not"]}
+{"id": "q13", "question": "How many cycles does the AR-2100 last to 80% SOH at 1C, 100% DOD, 25C?", "type": "answerable", "expected_source": "example_cell_datasheet.md", "answer_contains": ["1000"]}
+{"id": "q14", "question": "Which standard governs the functional safety of the BMS electronics?", "type": "answerable", "expected_source": "standards_overview.md", "answer_contains": ["26262"]}
+{"id": "q15", "question": "What does UN 38.3 cover?", "type": "answerable", "expected_source": "standards_overview.md", "answer_contains": ["transport"]}
+{"id": "q16", "question": "Which standard is most relevant to cell cycle-life testing for EV propulsion?", "type": "answerable", "expected_source": "standards_overview.md", "answer_contains": ["62660"]}
+{"id": "q17", "question": "What are the ASIL levels in ISO 26262?", "type": "answerable", "expected_source": "standards_overview.md", "answer_contains": ["A", "D"]}
+{"id": "q18", "question": "What is the price of the Aurora AR-2100 cell?", "type": "not_found", "expected_source": null, "answer_contains": []}
+{"id": "q19", "question": "Who won the 2010 FIFA World Cup?", "type": "not_found", "expected_source": null, "answer_contains": []}
+{"id": "q20", "question": "What is the WLTP range of the Volkswagen ID.3?", "type": "not_found", "expected_source": null, "answer_contains": []}

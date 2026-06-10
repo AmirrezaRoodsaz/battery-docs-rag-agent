@@ -1,102 +1,198 @@
 # Battery Docs RAG Agent
 
 **Ask natural-language questions over a corpus of battery & engineering documents and get
-accurate, *cited* answers — and have the system say "not found in the provided documents"
+accurate, *cited* answers — and the system says *"not found in the provided documents"*
 rather than make something up.**
 
-> 🚧 **Status: in active development.** Phase 1 (scaffold) is in. The ingest → index →
-> retrieve → generate(+cite) core lands next, then a small honest evaluation, then an optional
-> agentic test-report mode and a Streamlit UI. Building in small, reviewable commits.
+A domain-anchored Retrieval-Augmented Generation (RAG) system: grounded, cited, and
+evaluated. Built as a thin custom stack (no LangChain/LlamaIndex) so every step —
+chunking, embedding, cosine retrieval, the grounding prompt, citation formatting — is plain,
+readable code. Local embeddings + FAISS run on a laptop with no paid infra; generation is
+provider-agnostic (Gemini by default, swappable to Claude / OpenAI / local Ollama).
+
+```text
+$ make ask Q="Who won the 2010 FIFA World Cup?"
+╭────────────────────────── Answer ──────────────────────────╮
+│ Not found in the provided documents.                       │
+╰────────────────────────────────────────────────────────────╯
+Sources:
+  [1] example_cell_datasheet.md — … (similarity 0.02)
+provider: (none) · model: (retrieval miss — no LLM call)
+```
+*An out-of-corpus question is refused — without even calling the LLM. Grounding first,
+fluency second.*
 
 ---
 
-## Why this project
+## Problem & motivation
 
 Battery and automotive engineers work against a wall of dense technical documents — cell
 **datasheets**, **test reports**, BMS specs, and standards like **ISO 26262** / **UN 38.3** /
-**IEC 62660**. Finding the right value or clause is slow and error-prone. A naive "chat with your
-PDF" demo doesn't solve it, because a confidently wrong answer about a safety standard is worse
-than no answer.
+**IEC 62660**. Finding the right value or clause is slow and error-prone, and a naive "chat
+with your PDF" demo doesn't help, because a confidently wrong answer about a safety standard
+is worse than no answer.
 
-The valuable, defensible problem:
+The valuable, defensible problem this solves:
 
 > Let an engineer ask questions over a battery/engineering corpus and get answers that are
-> **grounded** (drawn only from the documents), **cited** (every claim points back to its source
-> chunk), and **honest** (the system refuses when the answer isn't in the corpus).
+> **grounded** (drawn only from the documents), **cited** (every claim points back to its
+> source chunk), and **honest** (the system refuses when the answer isn't in the corpus).
 
-This is retrieval-augmented generation done *correctly* — applied to a domain I actually
-understand from my Master's work on EV battery **State of Health (SOH)**.
-
-## What it does (target)
-
-- **Grounded, cited Q&A** over a local document corpus — the anti-hallucination centerpiece.
-- **"Not found" behavior** when the corpus doesn't support an answer (no guessing).
-- **Provider-agnostic** generation — Gemini by default, swappable to Claude / OpenAI / local Ollama.
-- **Local, free embeddings** (`sentence-transformers`) and a local **FAISS** index — runs on a laptop, no paid infra.
-- **A small, honest evaluation** — hand-written Q&A measuring retrieval hit-rate and answer faithfulness.
-- **(Stretch) Agentic mode** — given a battery test-report PDF, an agent extracts key parameters
-  (capacity, SOH, internal resistance, temperature range, anomalies) and produces a structured
-  diagnostic summary.
+This is retrieval-augmented generation done *correctly* — applied to a domain I understand
+from my Master's work on EV battery **State of Health (SOH)**.
 
 ## Architecture
 
 ```
                  ┌─────────────┐   ┌────────────┐   ┌──────────────┐
   documents ───▶ │   ingest    │──▶│   chunk    │──▶│   embed      │
-  (md / pdf)     │ load + clean│   │ ~structure │   │ MiniLM (local)│
+  (md / pdf)     │ load + clean│   │ structure- │   │ MiniLM (local)│
+                 │  + locators │   │  aware     │   │ L2-normalized │
                  └─────────────┘   └────────────┘   └──────┬───────┘
                                                             ▼
                                                      ┌──────────────┐
   question ───────────────────────────────────────▶ │   retrieve   │  top-k cosine
-                                                     │  (FAISS)     │  + source metadata
+                                                     │  (FAISS,     │  (+ optional MMR)
+                                                     │   exact IP)  │  → chunks + metadata
                                                      └──────┬───────┘
                                                             ▼
                                                      ┌──────────────┐
                                                      │  generate    │  grounding prompt:
-                                                     │  (LLM, any   │  answer ONLY from context,
-                                                     │   provider)  │  cite sources, else "not found"
+                                                     │ (any provider│  answer ONLY from context,
+                                                     │  via one env)│  cite [n], else "not found"
                                                      └──────┬───────┘
                                                             ▼
                                                   answer + inline citations
 ```
 
-Design choice: a **thin custom stack** (no LangChain/LlamaIndex), so every step — chunking,
-embedding, cosine retrieval, the grounding prompt, citation formatting — is plain, readable code
-I can explain line by line in an interview. Clever vs. explainable → explainable.
+| Stage | File | What it does |
+|---|---|---|
+| Ingest | [`src/ingest/load.py`](src/ingest/load.py) | Markdown (heading-path locators) + PDF (page locators) → blocks that remember their source |
+| Chunk | [`src/ingest/chunk.py`](src/ingest/chunk.py) | structure-aware ~500-token chunks, ~60 overlap |
+| Embed | [`src/index/embed.py`](src/index/embed.py) | local `all-MiniLM-L6-v2`, L2-normalized (so inner product = cosine) |
+| Store | [`src/index/vectorstore.py`](src/index/vectorstore.py) | exact FAISS `IndexFlatIP` + JSON metadata sidecar |
+| Retrieve | [`src/rag/retrieve.py`](src/rag/retrieve.py) | top-k cosine, optional MMR re-ranking |
+| Generate | [`src/rag/generate.py`](src/rag/generate.py) | grounding prompt + "not found" refusal |
+| Cite | [`src/rag/cite.py`](src/rag/cite.py) | label chunks `[n]`, render Sources list |
+| LLM layer | [`src/llm/provider.py`](src/llm/provider.py) | provider-agnostic: gemini \| claude \| openai \| ollama |
 
 ## Corpus
 
-Public / self-authored only. The repo ships self-written notes on SOH methods, Li-ion basics, a
-plain-language standards overview, and a **fictional** example datasheet — all unambiguously mine
-to publish. Standard texts (ISO/UN/IEC) are summarized in my own words, never copied. Provenance
-and licensing per document: [`data/README.md`](data/README.md). Nothing proprietary, no thesis or
-AVL data.
+Public / self-authored only — provenance and license per document in
+[`data/README.md`](data/README.md). Ships: self-written notes on
+[SOH methods](data/corpus/soh_methods.md) and [Li-ion basics](data/corpus/li_ion_basics.md),
+a [plain-language standards overview](data/corpus/standards_overview.md) (my own words — no
+copyrighted standard text), and a **fictional** [example datasheet](data/corpus/example_cell_datasheet.md)
+with invented numbers. **Nothing proprietary** — no thesis or AVL data. Any real manufacturer
+PDF you add locally is gitignored so it's never accidentally redistributed.
+
+## Anti-hallucination design
+
+This is the part a skeptical senior engineer cares about most. Three layers:
+
+1. **Grounding prompt** — answer *only* from the retrieved passages; reply exactly *"Not
+   found in the provided documents"* when unsupported. Refusal is a first-class behaviour,
+   not an error.
+2. **Citations** — every answer cites the `[n]` of each chunk it used; the Sources list maps
+   `[n]` → file, section, and similarity score. This makes any claim checkable in seconds.
+   Citations don't prevent hallucination, they make it *detectable* — which is what makes the
+   tool trustworthy.
+3. **Retrieval backstop** — if the top chunk's similarity is below a threshold, the system
+   refuses *without calling the LLM* (cheap insurance against garbage queries).
+
+> RAG **reduces** hallucination (the model is anchored to real text) but does not
+> **eliminate** it (it can misread context) — which is exactly why this repo also evaluates.
+
+## Evaluation
+
+Honest, transparent eval on a small hand-written set (`eval/qa_set.jsonl`: 17 answerable +
+3 out-of-corpus questions). Retrieval is measured **separately** from generation — if the
+right chunk never comes back, no prompt can fix it. Full results + per-question detail in
+[`reports/results.md`](reports/results.md); regenerate with `make eval`.
+
+| Metric | Score | What it measures |
+|---|---|---|
+| Retrieval **hit@1** | **16/17 (94%)** | the *first* chunk is from the expected source (the hard metric) |
+| Retrieval **hit@4** | **17/17 (100%)** | expected source appears in the top-4 the LLM sees |
+| Retrieval **MRR** | **0.97** | mean reciprocal rank of the first correct chunk |
+| Answer correctness | _run with a key_ | grounded answer contains the expected fact (faithfulness proxy) |
+| Refusal accuracy | _run with a key_ | out-of-corpus questions correctly refused |
+
+**The honest failure** (the credible part): `q07 — "difference between SOC and SOH"` misses
+hit@1, because that concept lives in *two* documents, so the top chunk comes from the
+related-but-not-tagged one. hit@4 still catches it. I keep the corpus small and the questions
+self-written, so I do **not** claim these numbers generalize — they prove the pipeline works
+and that I can measure it, not that it's a tuned production retriever.
+
+> Answer-correctness and refusal-accuracy require a generation call, so they're computed when
+> an LLM key is set in `.env`. Set one and run `make eval` to fill those rows in
+> `reports/results.md`.
 
 ## How to run
 
-> Full commands land with the Phase 2–3 code. The intended flow:
+**Prerequisites:** Python 3.11. Embeddings run locally (no key). Generation needs one provider
+key — Gemini's free tier is the default.
 
 ```bash
 make install                       # venv + pinned deps (Python 3.11)
-make index                         # build the local FAISS index from data/corpus/
-make ask Q="What is State of Health and how is it measured?"
+make index                         # build the local FAISS index from data/corpus/ (~7 s)
+
+cp .env.example .env               # then add your GOOGLE_API_KEY (free: aistudio.google.com)
+make ask Q="What is the maximum charge voltage of the AR-2100?"
+make ask Q="What is the difference between SOC and SOH?"
+make eval                          # retrieval + answer correctness + refusal accuracy
+make test                          # 20 tests: chunking, retrieval, citations, grounding
 ```
 
-Embeddings run locally and need no key. Generation uses your chosen LLM provider — copy
-`.env.example` to `.env` and set the key for the one you use (Gemini's free tier is the default).
+Two things work **with no key at all**: building/querying the index for retrieval
+(`python -m src.rag.cli retrieve "..."`) and the "not found" refusal path. Cost is near-zero:
+local embeddings are free; with Gemini Flash the full 20-question eval is a handful of cheap
+calls.
 
-## Roadmap
+To swap providers, set `LLM_PROVIDER` in `.env` to `claude`, `openai`, or `ollama` (local,
+also keyless) — no code change.
 
-- [x] **Phase 1** — repo scaffold, licensing, secrets hygiene, conventions
-- [ ] **Phase 2** — ingest + chunk + embed + FAISS index (`make index`)
-- [ ] **Phase 3** — retrieve + generate + cite + "not found"; CLI (`make ask`)
-- [ ] **Phase 4** — evaluation set + honest results; full README with screenshot
-- [ ] **Phase 5** — agentic test-report mode + Streamlit UI
+## What I learned / limitations / next steps
+
+- **Grounding + citations matter more than the model.** The defensible engineering here is
+  the refusal behaviour and verifiable sources, not the choice of LLM — which is exactly why
+  the LLM is swappable behind one interface.
+- **Separate retrieval from generation when you evaluate.** hit@1 vs hit@k told me *where*
+  the system is weak (multi-document concepts) in a way an end-to-end score would have hidden.
+- **Small clean corpus inflates easy metrics.** File-level hit-rate was 100% and meaningless
+  with 4 docs; hit@1 and MRR are the honest metrics, and they surfaced a real miss.
+- **Where it fails:** tables in datasheets (extraction can mangle them), multi-hop questions,
+  and exact normative clause text (correctly refused, since I only summarize standards).
+- **Next steps:** a re-ranker over top-k, an LLM-judge faithfulness metric, hybrid
+  (keyword + vector) retrieval for exact part numbers, the agentic test-report mode and the
+  Streamlit UI (Phase 5).
+
+## Repository layout
+
+```
+data/corpus/        self-authored, publishable corpus (+ data/README.md provenance)
+src/ingest/         load.py, chunk.py
+src/index/          embed.py, vectorstore.py
+src/rag/            retrieve.py, generate.py, cite.py, cli.py
+src/llm/            provider.py (gemini | claude | openai | ollama)
+src/agent/          (Phase 5) tool-using test-report mode
+eval/               qa_set.jsonl + run_eval.py
+reports/            results.md (eval) + interview_notes.md
+tests/              pytest: chunking, retrieval, citations, grounding
+app/                (Phase 5) Streamlit chat UI with visible citations
+```
+
+## Citation & acknowledgements
+
+An independent, self-authored learning project. The corpus is written specifically for this
+repo or synthesized (the example datasheet is fictional); no proprietary or third-party
+copyrighted material is redistributed. Standard summaries are paraphrased in my own words —
+consult the official ISO/UN/IEC documents for authoritative requirements.
 
 ## License
 
-[MIT](LICENSE) © 2026 Amirreza Roodsaz — code only. Corpus licensing is tracked per document in
-[`data/README.md`](data/README.md).
+[MIT](LICENSE) © 2026 Amirreza Roodsaz — code only. Corpus licensing is tracked per document
+in [`data/README.md`](data/README.md).
 
 ---
 
