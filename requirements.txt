@@ -1,0 +1,31 @@
+# Pinned for reproducibility. Python 3.11.
+# Thin custom RAG stack — local embeddings + FAISS + a provider-agnostic LLM layer.
+# No heavyweight framework (no LangChain/LlamaIndex) so every step is explainable.
+
+# --- Core retrieval stack ---
+faiss-cpu==1.8.0.post1          # local vector index (cosine via normalized inner product)
+sentence-transformers==3.0.1    # local embeddings (all-MiniLM-L6-v2), no API key
+numpy==1.26.4
+
+# --- Document ingestion ---
+pypdf==4.3.1                    # PDF text extraction
+pdfplumber==0.11.4             # table-aware extraction for datasheets
+
+# --- LLM provider SDKs (only the one you use needs its key set) ---
+google-generativeai==0.8.3     # Gemini (default)
+# anthropic==0.39.0            # uncomment to use Claude
+# openai==1.54.4               # uncomment to use OpenAI
+# ollama runs over plain HTTP — no SDK pinned
+
+# --- Config + CLI ---
+python-dotenv==1.0.1           # load .env
+typer==0.12.5                  # CLI for `index` / `ask` / `eval`
+rich==13.9.4                   # readable terminal output (answers + citations)
+
+# --- Optional demo UI (Phase 5) ---
+streamlit==1.39.0
+
+# --- Dev tooling ---
+pytest==8.3.3
+black==24.10.0
+ruff==0.7.2

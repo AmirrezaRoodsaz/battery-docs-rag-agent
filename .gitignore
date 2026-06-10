@@ -1,0 +1,44 @@
+# --- Secrets: NEVER commit real API keys. Only .env.example is tracked. ---
+.env
+.env.*
+!.env.example
+
+# --- Vector index: regenerable from the corpus via `make index`. ---
+data/index/*
+!data/index/.gitkeep
+
+# --- Large / license-bound source PDFs. The corpus we ship is small + self-authored,
+#     but any manufacturer datasheet you add locally should stay out of git. ---
+data/corpus/*.pdf
+data/test_reports/*.pdf
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Model / embedding caches downloaded at runtime ---
+.cache/
+
+# --- Tooling caches ---
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- OS / editor ---
+.DS_Store
+.vscode/
+.idea/
+
+# --- Private local notes (not part of the public repo) ---
+_notes/
