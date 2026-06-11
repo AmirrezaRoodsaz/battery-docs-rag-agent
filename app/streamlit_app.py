@@ -103,25 +103,21 @@ with tab_ask:
         "Question", key="q", placeholder="What is State of Health and how is it measured?"
     )
     if st.button("Ask", type="primary") and question:
-        from src.llm.provider import LLMError, get_provider
+        from src.llm.provider import LLMError
+        from src.rag.cite import build_context
         from src.rag.generate import answer_question
 
-        with st.spinner("Retrieving + generating…"):
+        # Retrieval is LOCAL and always works (no key). We show it first so the grounding is
+        # visible even before — or without — generation. Then we attempt to generate.
+        with st.spinner("Retrieving…"):
+            hits = retriever.retrieve(question, k=top_k, use_mmr=use_mmr)
+        _, citations = build_context(hits)
+
+        with st.spinner("Generating…"):
             try:
-                provider_obj = None if not needs_key else get_provider()
-                result = answer_question(
-                    question,
-                    retriever,
-                    k=top_k,
-                    use_mmr=use_mmr,
-                    provider=provider_obj if needs_key else None,
-                )
-            except LLMError as e:
-                st.warning(f"{e}")
-                st.info(
-                    "Tip: paste your API key in the sidebar, or switch provider to Ollama (keyless, local)."
-                )
-                result = None
+                result = answer_question(question, retriever, k=top_k, use_mmr=use_mmr)
+            except LLMError:
+                result = None  # no key / provider not reachable — retrieval still shown below
 
         if result is not None:
             if result.is_grounded:
@@ -129,18 +125,28 @@ with tab_ask:
             else:
                 st.warning(result.answer + "  \n_(refused — not supported by the corpus)_")
             st.caption(f"provider: {result.provider} · model: {result.model}")
+            citations = result.citations
+            hits = result.hits
+        else:
+            st.info(
+                "Retrieved the sources below. **Add an API key in the sidebar** to generate the "
+                "grounded answer from them (embeddings are local; only generation needs a key)."
+            )
 
-            st.markdown("**Sources**")
-            for c in result.citations:
-                st.markdown(
-                    f"- `[{c.label}]` **{c.source}** — {c.locator}  ·  similarity `{c.score:.2f}`"
-                )
+        st.markdown("**Sources**")
+        for c in citations:
+            st.markdown(
+                f"- `[{c.label}]` **{c.source}** — {c.locator}  ·  similarity `{c.score:.2f}`"
+            )
 
-            with st.expander("Show the exact retrieved chunks (what the answer was grounded on)"):
-                for c, hit in zip(result.citations, result.hits, strict=False):
-                    st.markdown(f"**[{c.label}] {c.source} — {c.locator}**  ·  sim `{c.score:.2f}`")
-                    st.text(hit.chunk.text)
-                    st.divider()
+        with st.expander(
+            "Show the exact retrieved chunks (what the answer is grounded on)",
+            expanded=result is None,
+        ):
+            for c, hit in zip(citations, hits, strict=False):
+                st.markdown(f"**[{c.label}] {c.source} — {c.locator}**  ·  sim `{c.score:.2f}`")
+                st.text(hit.chunk.text)
+                st.divider()
 
 # --- Tab 2: agentic test-report diagnostics ---------------------------------------------
 

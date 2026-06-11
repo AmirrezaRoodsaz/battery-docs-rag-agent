@@ -10,6 +10,16 @@ chunking, embedding, cosine retrieval, the grounding prompt, citation formatting
 readable code. Local embeddings + FAISS run on a laptop with no paid infra; generation is
 provider-agnostic (Gemini by default, swappable to Claude / OpenAI / local Ollama).
 
+![Streamlit UI: a datasheet question, the retrieved sources with similarity scores, and the exact chunks the answer is grounded on](reports/figures/ui_ask_retrieval.png)
+
+*The Streamlit UI. A datasheet question retrieves its sources — each shown with its file,
+section, and similarity score — and the exact chunks the answer will be grounded on are
+visible below. Embeddings run locally, so retrieval works with no key; you paste an API key
+in the sidebar only to generate the final cited answer. Transparency is the point: you can
+see what the answer is built from.*
+
+And the anti-hallucination behaviour, on an out-of-corpus question:
+
 ```text
 $ make ask Q="Who won the 2010 FIFA World Cup?"
 ╭────────────────────────── Answer ──────────────────────────╮
@@ -19,8 +29,7 @@ Sources:
   [1] example_cell_datasheet.md — … (similarity 0.02)
 provider: (none) · model: (retrieval miss — no LLM call)
 ```
-*An out-of-corpus question is refused — without even calling the LLM. Grounding first,
-fluency second.*
+*Refused — without even calling the LLM. Grounding first, fluency second.*
 
 ---
 
