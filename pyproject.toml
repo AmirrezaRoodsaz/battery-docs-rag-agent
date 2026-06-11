@@ -28,6 +28,11 @@ target-version = "py311"
 select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["E501"]  # line length handled by black
 
+[tool.ruff.lint.flake8-bugbear]
+# Typer's CLI signature pattern uses typer.Argument()/Option() as parameter defaults by
+# design — exempt them from B008 (function-call-in-default-argument).
+extend-immutable-calls = ["typer.Argument", "typer.Option"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

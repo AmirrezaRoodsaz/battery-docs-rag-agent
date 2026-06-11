@@ -141,7 +141,9 @@ cp .env.example .env               # then add your GOOGLE_API_KEY (free: aistudi
 make ask Q="What is the maximum charge voltage of the AR-2100?"
 make ask Q="What is the difference between SOC and SOH?"
 make eval                          # retrieval + answer correctness + refusal accuracy
-make test                          # 20 tests: chunking, retrieval, citations, grounding
+make test                          # 33 tests: chunking, retrieval, citations, grounding, agent
+make app                           # Streamlit UI (paste your key in the sidebar — no .env needed)
+make agent F=data/test_reports/report_02_degraded.md   # agentic diagnostic on a test report
 ```
 
 Two things work **with no key at all**: building/querying the index for retrieval
@@ -151,6 +153,42 @@ calls.
 
 To swap providers, set `LLM_PROVIDER` in `.env` to `claude`, `openai`, or `ollama` (local,
 also keyless) — no code change.
+
+## Demo (Streamlit UI)
+
+`make app` opens a browser UI at `http://localhost:8501`. **Paste your API key in the
+sidebar** — it lives only in that session's memory and is never written to disk or committed
+(so you don't need a `.env` to try it). Two tabs:
+
+- **💬 Ask (RAG)** — type a question, get a grounded answer with a **Sources** list, and
+  expand *"Show the exact retrieved chunks"* to see precisely what the answer was grounded on.
+  Transparency is the point: you can watch it cite, and watch it refuse.
+- **🩺 Diagnose a test report (agent)** — pick a synthesized test report and run the agent
+  (below); the verdict, the structured summary, the JSON, and the full tool-call trace are all
+  shown.
+
+Embeddings run locally, so retrieval works the moment the app loads; only generation uses your key.
+
+## Agentic test-report mode
+
+Beyond Q&A, the repo includes a **bounded, observable agent** that turns a battery
+test-report into a structured diagnosis. It differs from the RAG path in shape: RAG is one
+`retrieve → generate` step; the agent is a **loop** ([`src/agent/agent_loop.py`](src/agent/agent_loop.py)):
+
+```
+read report → [ LLM picks a tool → tool runs → observation ]* → LLM writes the diagnosis
+```
+
+The LLM **reads** values from the report and **decides** which tool to call; the
+[**tools**](src/agent/tools.py) do the arithmetic and threshold logic — `compute_soh`,
+`resistance_growth_pct`, `evaluate_health` — so the numbers are **never hallucinated**. The loop
+is **bounded** (a hard `max_steps` cap, it can't run away) and **observable** (every step is
+logged and shown). On the deliberately-degraded sample it flags capacity-EOL (SOH 77 %), the
+resistance growth, and a thermal limit excursion, and emits both Markdown and JSON.
+
+```bash
+make agent F=data/test_reports/report_02_degraded.md   # or report_01_healthy.md
+```
 
 ## What I learned / limitations / next steps
 
@@ -164,8 +202,8 @@ also keyless) — no code change.
 - **Where it fails:** tables in datasheets (extraction can mangle them), multi-hop questions,
   and exact normative clause text (correctly refused, since I only summarize standards).
 - **Next steps:** a re-ranker over top-k, an LLM-judge faithfulness metric, hybrid
-  (keyword + vector) retrieval for exact part numbers, the agentic test-report mode and the
-  Streamlit UI (Phase 5).
+  (keyword + vector) retrieval for exact part numbers, table-aware ingestion, and letting the
+  agent pull rated values from the datasheet corpus via retrieval rather than from the report alone.
 
 ## Repository layout
 
